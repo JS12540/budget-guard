@@ -51,7 +51,8 @@ function main() {
 
   lines.push(`  Budget used:  ${pct}%`);
   lines.push(`  [${bar}]`);
-  lines.push(`  ~${fmt(used)} / ~${fmt(budget)} tokens (estimated)`);
+  const dataLabel = state.has_real_data ? 'real API data' : 'estimated';
+  lines.push(`  ~${fmt(used)} / ~${fmt(budget)} tokens  [${dataLabel}]`);
   lines.push('');
 
   // Status
@@ -67,7 +68,10 @@ function main() {
   lines.push(`  Thresholds:  warn at ${warn}%  ·  critical at ${crit}%`);
   lines.push('');
 
-  // Tool calls
+  // Turns + tool calls
+  if (state.turn_count > 0) {
+    lines.push(`  Conversation turns:  ${state.turn_count}`);
+  }
   lines.push(`  Tool calls this session:  ${calls}`);
   if (state.started_at) {
     const elapsed = msToHuman(Date.now() - new Date(state.started_at).getTime());
@@ -84,13 +88,17 @@ function main() {
   lines.push('  ──────────────────────────────────────────');
 
   const cats = [
-    { key: 'file_ops', label: 'File ops ', icon: '📁' },
-    { key: 'bash',     label: 'Bash     ', icon: '💻' },
-    { key: 'search',   label: 'Search   ', icon: '🌐' },
-    { key: 'mcp',      label: 'MCP      ', icon: '🔌' },
-    { key: 'agent',    label: 'Agent    ', icon: '🤖' },
-    { key: 'other',    label: 'Other    ', icon: '🔧' }
-  ];
+    { key: 'responses',     label: 'Responses   ', icon: '🧠' },
+    { key: 'user_messages', label: 'Your msgs   ', icon: '💬' },
+    { key: 'tool_results',  label: 'Tool output ', icon: '📤' },
+    { key: 'file_ops',      label: 'File ops    ', icon: '📁' },
+    { key: 'bash',          label: 'Bash        ', icon: '💻' },
+    { key: 'search',        label: 'Search      ', icon: '🌐' },
+    { key: 'mcp',           label: 'MCP         ', icon: '🔌' },
+    { key: 'agent',         label: 'Agent       ', icon: '🤖' },
+    { key: 'thinking',      label: 'Thinking    ', icon: '💭' },
+    { key: 'other',         label: 'Other       ', icon: '🔧' }
+  ].filter(c => (bd[c.key] || 0) > 0 || ['responses', 'user_messages', 'file_ops'].includes(c.key));
 
   const maxCost = Math.max(1, ...cats.map(c => bd[c.key] || 0));
 
