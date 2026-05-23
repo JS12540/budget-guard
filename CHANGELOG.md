@@ -5,34 +5,109 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.1] — 2026-05-23
+
+### Added
+
+- **Full session token tracking** — Budget Guard now tracks every token source in a session, not just tool call inputs:
+  - `UserPromptSubmit` hook — estimates tokens from every user message you send
+  - `PostToolUse` hook — estimates tokens from tool outputs (file contents, bash stdout, search results, MCP responses) using actual response text length
+  - `Stop` hook — captures real `input_tokens`, `output_tokens`, and `thinking_tokens` directly from the Claude API response when available; these override all estimates with ground truth
+- **Real API data mode** — when the `Stop` hook provides actual token counts, `total_tokens` is replaced with the real context window size rather than a running estimate. The `/budget-guard:budget` report labels which mode is active: `[real API data]` vs `[estimated]`
+- **New breakdown categories** in session state and the budget report:
+  - `responses` — Claude's answer tokens (from Stop hook)
+  - `user_messages` — your prompt tokens (from UserPromptSubmit)
+  - `tool_results` — tool output tokens (from PostToolUse)
+  - `thinking` — thinking tokens (from Stop hook, if present)
+  - `cache` — cache read + creation tokens (from Stop hook, if present)
+- **`turn_count`** — tracks how many conversation turns have occurred; shown in the budget report alongside tool call count
+- **`has_real_data`** flag in session state — indicates whether at least one Stop hook has provided real API counts
+- **`last_input_tokens`** field — snapshots the most recent API-reported input token count for trend analysis
+
+### Changed
+
+- `hooks/hooks.json` switched from shell form (`"command": "node \"...\""`) to exec form (`"command": "node"` + `"args": [...]`) — fixes unreliable hook firing on some platforms where shell PATH resolution differed
+- Budget report breakdown table now shows all token categories; zero-value categories are hidden except `responses`, `user_messages`, and `file_ops` which are always shown
+- Budget report now shows conversation turns count
+
+### Fixed
+
+- Marketplace name collision bug — renamed marketplace from `budget-guard` to `claude-code-labs` so the marketplace name and plugin name no longer share the same string, which caused Claude Code to misclassify the source type as unsupported
+- `"source": "."` changed to `"source": "./"` in `marketplace.json` — bare dot was not recognised as a valid relative path by some Claude Code versions
+- Added explicit `"skills"` array to `plugin.json` — matches the format used by all working community plugins
+- Removed `$schema`, `displayName`, `homepage`, and `repository` fields from `plugin.json` — these non-standard fields caused install failures in some Claude Code versions
+
+---
+
 ## [1.0.0] — 2026-05-22
 
 ### Added
-- `PreToolUse` hook that estimates token cost per tool call using actual input data
-  - `Read`: uses real file size via `fs.statSync()`, respects `offset`/`limit`
-  - `Write` / `Edit` / `MultiEdit`: measures content length
-  - `Bash`: command text length + output overhead
-  - `WebFetch` / `WebSearch` / `Agent` / `mcp__*`: calibrated fixed estimates
-- Four progressive warning tiers (advisory → elevated → critical → urgent)
-  - Each fires exactly once per session via persistent flags
-  - Warnings delivered to Claude via `additionalContext` (non-blocking)
-- `SessionStart` hook that initialises or restores session state
-  - Handles `startup`, `resume`, `clear`, and `compact` sources correctly
-  - Archives previous session to history on fresh start
-- `PostCompact` hook that updates token baseline after `/compact`
-  - Resets all warning flags so they re-fire naturally from the new baseline
-  - Uses Claude Code's reported `tokens_after` for accurate post-compact count
-- `/budget-guard:budget` skill — formatted live report with:
-  - Progress bar
-  - Breakdown by category (file ops, bash, search, MCP, agent, other)
-  - Status line with actionable status
-  - Context-aware recommendations
-  - Last-5-session history
-- `/budget-guard:reset` skill — zeros all counters and clears warning flags
-- `userConfig` for in-dialog configuration at plugin enable time
-- Env var overrides: `CLAUDE_BUDGET_GUARD_LIMIT`, `CLAUDE_BUDGET_GUARD_WARN`, `CLAUDE_BUDGET_GUARD_CRITICAL`
-- Session files stored in `${CLAUDE_PLUGIN_DATA}/sessions/<id>.json`
-- Automatic 7-day pruning of old session files
-- Session history (last 50) in `${CLAUDE_PLUGIN_DATA}/history.json`
-- Atomic state writes (pid-unique temp + rename) for concurrent-session safety
-- Pure Node.js implementation — works on macOS, Linux, and Windows natively
+
+- **`PreToolUse` hook** — fires before every tool call, estimates input token cost using actual data:
+  - `Read` — uses real file size via `fs.statSync()`, respects `offset` and `limit` parameters
+  - `Write` — measures actual content length
+  - `Edit` / `MultiEdit` — measures combined old + new string lengths
+  - `Bash` — command text length + fixed output overhead
+  - `WebFetch` — fixed ~3,500 tokens (typical page)
+  - `WebSearch` — fixed ~1,800 tokens
+  - `Agent` / `Task` — fixed ~5,000 tokens (subagent spawn overhead)
+  - `mcp__*` — fixed ~2,500 tokens
+  - `Glob` / `Grep` / `LS` — fixed small values (200–350 tokens)
+
+- **Four progressive warning tiers** delivered to Claude via `additionalContext` (non-blocking — never denies a tool call):
+  - Advisory at `warn_threshold`% (default 60%)
+  - Elevated at midpoint between warn and critical
+  - Critical at `critical_threshold`% (default 85%)
+  - Urgent at midpoint between critical and 100%
+  - Each tier fires exactly once per session via persistent boolean flags
+
+- **`SessionStart` hook** — initialises or restores session state on every session event:
+  - `startup` / `clear` — archives previous session (if it had activity) and resets state
+  - `resume` — restores accumulated state, updates config values
+  - `compact` — keeps token count, resets warning flags, increments `compacted_count`
+
+- **Interactive first-run setup wizard** — on the very first session start (no `config.json` found), opens the terminal directly via `/dev/tty` (macOS/Linux) or `\\.\CONIN$` / `\\.\CONOUT$` (Windows) and prompts for:
+  - Session token budget (default: 100,000)
+  - Warning threshold % (default: 60)
+  - Critical threshold % (default: 85)
+  - 30-second per-question timeout — falls back to defaults automatically if no input
+  - Falls back silently to defaults in non-interactive environments (CI, pipes, containers)
+
+- **`PostCompact` hook** — fires after `/compact`:
+  - Resets `total_tokens` to the post-compact baseline reported by Claude Code
+  - Resets all four warning flags so they re-fire naturally from the new baseline
+  - Increments `compacted_count` and records `compacted_at` timestamp
+
+- **`/budget-guard:budget` skill** — formatted live report including:
+  - Progress bar (30-char filled/empty block)
+  - Percentage used with absolute token counts
+  - Status line: Healthy / Warning / Elevated / Critical
+  - Context-aware recommendations based on dominant cost category
+  - Session metadata: start time, elapsed time, compact count
+  - Last-5-session history with per-session bar charts
+
+- **`/budget-guard:reset` skill** — zeros all counters, clears all warning flags, and resets the session start time without ending the session
+
+- **Config priority chain** (highest to lowest):
+  1. `CLAUDE_BUDGET_GUARD_LIMIT` / `_WARN` / `_CRITICAL` env vars
+  2. `CLAUDE_PLUGIN_OPTION_SESSION_BUDGET` / `_WARN_THRESHOLD` / `_CRITICAL_THRESHOLD` (plugin `userConfig` dialog)
+  3. `${CLAUDE_PLUGIN_DATA}/config.json` (written by the first-run wizard)
+  4. Hardcoded defaults (100,000 / 60% / 85%)
+
+- **`userConfig`** in `plugin.json` — exposes the three settings in the Claude Code plugin configuration dialog with types, titles, descriptions, and valid ranges
+
+- **Persistent session state** at `${CLAUDE_PLUGIN_DATA}/sessions/<session_id>.json`:
+  - Atomic writes (pid-unique temp file → `fs.renameSync`) prevent corruption from concurrent sessions
+  - Session ID sanitised to a safe filename on all platforms
+
+- **Session history** — last 50 completed sessions archived to `${CLAUDE_PLUGIN_DATA}/history.json`
+
+- **Automatic 7-day pruning** of old session files to prevent unbounded disk growth
+
+- **Pure Node.js implementation** — no native dependencies, no shell scripts, no platform-specific binaries; works identically on macOS, Linux, Windows, and WSL
+
+- **`marketplace.json`** at `.claude-plugin/marketplace.json` enabling install via:
+  ```
+  /plugin marketplace add https://github.com/JS12540/budget-guard
+  /plugin install budget-guard@claude-code-labs
+  ```
