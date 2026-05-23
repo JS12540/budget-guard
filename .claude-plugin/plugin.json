@@ -1,7 +1,7 @@
 {
   "name": "budget-guard",
   "description": "Tracks estimated token usage per tool call. Warns Claude at configurable thresholds so you never hit context limits by surprise. Shows a real-time breakdown by tool category.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "JS12540",
     "url": "https://github.com/JS12540"
