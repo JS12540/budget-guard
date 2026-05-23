@@ -160,7 +160,7 @@ Select **Install for you (user scope)** and confirm.
 
 ### Requirements
 
-- **Claude Code latest version** — the marketplace `source` type requires a recent build. Update with:
+- **Claude Code v1.x or later** — if you get a "source type not supported" error, update Claude Code:
   ```bash
   npm install -g @anthropic-ai/claude-code@latest
   ```
