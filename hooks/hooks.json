@@ -5,7 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-init.js\"",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/session-init.js"],
             "statusMessage": "Budget Guard initialising…"
           }
         ]
@@ -17,7 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/track-cost.js\""
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/track-cost.js"]
           }
         ]
       }
@@ -27,7 +29,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/post-compact.js\"",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/post-compact.js"],
             "statusMessage": "Budget Guard updating after compaction…"
           }
         ]
