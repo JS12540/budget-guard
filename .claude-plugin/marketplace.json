@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "budget-guard",
-      "source": ".",
+      "source": "./",
       "description": "Tracks estimated token usage per tool call with progressive threshold warnings and a live breakdown via /budget-guard:budget."
     }
   ]
