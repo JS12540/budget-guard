@@ -1,12 +1,13 @@
 # Budget Guard
 
-> A Claude Code plugin that tracks estimated token usage per tool call, warns Claude at configurable thresholds, and gives you a real-time breakdown of where your session budget is going.
+> A Claude Code plugin that tracks **full session token usage** — your messages, Claude's responses, tool calls and outputs, and thinking tokens — warns Claude at configurable thresholds, and gives you a real-time breakdown of where your context window is going.
 
 ---
 
 ## Table of Contents
 
 - [What it does](#what-it-does)
+- [What gets tracked](#what-gets-tracked)
 - [Install](#install)
   - [From GitHub (recommended)](#from-github-recommended)
   - [From a local clone](#from-a-local-clone)
@@ -30,12 +31,32 @@
 
 Claude Code sessions have a finite context window. When it fills up, Claude Code auto-compacts — which can lose important context or interrupt a long task at a bad time. **Budget Guard** helps you get ahead of that.
 
-- **Fires before every tool call** — estimates the token cost using actual tool input data (real file sizes, content lengths, etc.)
+- **Tracks every token source** — your messages, Claude's responses, tool inputs, tool outputs, and thinking tokens
+- **Uses real API data when available** — the `Stop` hook captures actual `input_tokens` and `output_tokens` from the API response, replacing estimates with ground truth
 - **Four progressive warning tiers** — advisory → elevated → critical → urgent — each fires exactly once per session
 - **Warns Claude via `additionalContext`** — Claude sees the warning and can adjust its approach (prefer smaller reads, avoid WebFetch, suggest /compact)
 - **Reset-aware** — after `/compact`, warning flags reset and the token counter updates to the post-compact baseline
 - **Session history** — keeps the last 50 sessions for trend analysis
 - **Two slash commands**: `/budget-guard:budget` for a live report, `/budget-guard:reset` to zero the counter
+
+---
+
+## What gets tracked
+
+Budget Guard hooks into **six Claude Code events** to capture every token source in a session:
+
+| Hook | What it captures |
+|---|---|
+| `UserPromptSubmit` | Your message text — every prompt you send adds to the context |
+| `PreToolUse` | Tool call inputs — file paths, bash commands, search queries |
+| `PostToolUse` | Tool outputs — file contents, bash output, search results returned to Claude |
+| `Stop` | Claude's response tokens — the actual answer text; uses **real API counts** if available |
+| `SessionStart` | Initialises session state and budget config |
+| `PostCompact` | Resets the counter to the post-compact baseline after `/compact` |
+
+When the `Stop` event provides real `input_tokens` / `output_tokens` from the API, those numbers replace all running estimates — giving you the actual context window size, not a heuristic.
+
+The `/budget-guard:budget` report shows whether you are seeing **real API data** or **estimated** counts.
 
 ---
 
@@ -65,19 +86,18 @@ You should see: `Successfully added marketplace: claude-code-labs`
 
 A panel opens — select **Install for you (user scope)** and confirm.
 
-**Step 4 — Reload plugins**
+**Step 4 — Fully quit and relaunch Claude Code**
 
-```
-/reload-plugins
-```
+`/reload-plugins` alone is not enough — hooks only wire up correctly on a fresh launch:
 
-**Step 5 — Start a fresh session**
-
-```
-/new
+```bash
+# Quit Claude Code, then:
+claude
 ```
 
-On first run, a setup wizard appears in the terminal:
+**Step 5 — First-run setup wizard**
+
+On first session start, a wizard appears in the terminal:
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -94,13 +114,13 @@ Press Enter three times to accept the defaults, or type your own values.
 
 **Step 6 — Verify it's working**
 
-Make any tool call (e.g. ask Claude to read a file), then run:
+Send a message and run:
 
 ```
 /budget-guard:budget
 ```
 
-You should see a live report with non-zero token counts, a progress bar, and a per-tool breakdown.
+You should see a live report with non-zero token counts across all categories (your messages, responses, tool calls, tool outputs).
 
 ---
 
@@ -127,7 +147,7 @@ claude
 /plugin marketplace add /path/to/budget-guard
 ```
 
-Replace `/path/to/budget-guard` with the actual path.  
+Replace `/path/to/budget-guard` with the actual path where you cloned the repo.  
 Example: `/Users/yourname/projects/budget-guard`
 
 You should see: `Successfully added marketplace: claude-code-labs`
@@ -140,11 +160,10 @@ You should see: `Successfully added marketplace: claude-code-labs`
 
 Select **Install for you (user scope)** and confirm.
 
-**Step 5 — Reload and start fresh**
+**Step 5 — Fully quit and relaunch Claude Code**
 
-```
-/reload-plugins
-/new
+```bash
+claude
 ```
 
 ---
@@ -160,7 +179,7 @@ Select **Install for you (user scope)** and confirm.
 
 ### Requirements
 
-- **Claude Code v1.x or later** — if you get a "source type not supported" error, update Claude Code:
+- **Claude Code latest version** — if you get a "source type not supported" error, update:
   ```bash
   npm install -g @anthropic-ai/claude-code@latest
   ```
@@ -174,15 +193,16 @@ Budget Guard has three configurable values.
 
 ### 1. Plugin dialog (on install)
 
-When you install the plugin, a terminal wizard runs on first session start:
+On first session start, a terminal wizard asks for your budget and thresholds:
 
 | Setting | Description | Default |
 |---|---|---|
-| Session token budget | Estimated max tokens per session | `100000` |
+| Session token budget | Max tokens per session (context window size) | `100000` |
 | Warning threshold (%) | Advisory warning at this percentage | `60` |
 | Critical threshold (%) | Critical warning at this percentage | `85` |
 
 **Plan reference:**
+
 | Plan | Approximate session budget |
 |---|---|
 | Claude Pro | ~100,000 tokens |
@@ -197,7 +217,7 @@ rm ~/.claude/plugins/data/budget-guard/config.json
 
 ### 2. Environment variables (override)
 
-Set these in your shell profile to override the wizard values at any time:
+Set these in your shell profile to override wizard values at any time:
 
 ```bash
 export CLAUDE_BUDGET_GUARD_LIMIT=200000   # total token budget
@@ -213,24 +233,38 @@ Env vars take priority over the wizard config.
 
 | Command | Description |
 |---|---|
-| `/budget-guard:budget` | Show live budget report with breakdown, progress bar, status, and recommendations |
+| `/budget-guard:budget` | Show live report with full breakdown, progress bar, status, conversation turns, and recommendations |
 | `/budget-guard:reset` | Zero the counter and reset all warning flags for this session |
 
 ---
 
 ## How token costs are estimated
 
-Budget Guard uses a heuristic cost model — it is an estimate, not the actual Claude API token count. Estimates are intentionally conservative (they round up) so you get early warnings rather than late ones.
+Budget Guard uses real data wherever available, and conservative heuristics as fallback.
 
-| Tool | Estimation method |
+### Real data (when available)
+
+| Source | Method |
 |---|---|
-| `Read` | Actual file size via `fs.statSync()`, accounts for `offset`/`limit` parameters |
-| `Write` | Actual content length |
-| `Edit` / `MultiEdit` | Combined old + new string lengths |
-| `Bash` | Command text length + fixed output overhead |
-| `WebFetch` | Fixed ~3,500 tokens (typical page content) |
+| Claude's responses | `Stop` hook captures actual `output_tokens` from the API |
+| Full context size | `Stop` hook captures actual `input_tokens` — the ground truth for context window fullness |
+| Thinking tokens | `Stop` hook captures `thinking_tokens` if present |
+
+When real data is available, the report shows `[real API data]`. Otherwise it shows `[estimated]`.
+
+### Estimated (heuristic)
+
+| Source | Method |
+|---|---|
+| Your messages | Message character length ÷ 4 + framing overhead |
+| Tool outputs | Actual response text length ÷ 4 (from `PostToolUse`) |
+| `Read` input | Actual file size via `fs.statSync()`, accounts for `offset`/`limit` |
+| `Write` input | Actual content length |
+| `Edit` / `MultiEdit` input | Combined old + new string lengths |
+| `Bash` input | Command text length + fixed output overhead |
+| `WebFetch` | Fixed ~3,500 tokens |
 | `WebSearch` | Fixed ~1,800 tokens |
-| `Agent` / `Task` | Fixed ~5,000 tokens (subagent spawn overhead) |
+| `Agent` / `Task` | Fixed ~5,000 tokens |
 | `mcp__*` | Fixed ~2,500 tokens |
 | `Glob`, `Grep`, `LS` | Fixed small values (200–350 tokens) |
 
@@ -240,7 +274,7 @@ Budget Guard uses a heuristic cost model — it is an estimate, not the actual C
 
 | Tier | Threshold | What Claude sees |
 |---|---|---|
-| Advisory | `warn_threshold`% (default 60%) | Budget usage note with per-tool breakdown |
+| Advisory | `warn_threshold`% (default 60%) | Budget usage note with full breakdown |
 | Elevated | Midpoint between warn and critical | Stronger nudge to prefer targeted tool calls |
 | Critical | `critical_threshold`% (default 85%) | Recommendation to run `/compact` |
 | Urgent | Midpoint between critical and 100% | Strong push to compact immediately |
@@ -266,7 +300,7 @@ Budget Guard stores state in `${CLAUDE_PLUGIN_DATA}/sessions/<session_id>.json` 
 
 ## Platforms
 
-Works on **macOS, Linux, and Windows** — hook scripts are plain Node.js with no native dependencies or shell-specific syntax.
+Works on **macOS, Linux, and Windows** — all hook scripts are plain Node.js with no native dependencies or shell-specific syntax.
 
 | Platform | Status | Notes |
 |---|---|---|
