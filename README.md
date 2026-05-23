@@ -55,12 +55,12 @@ claude
 /plugin marketplace add https://github.com/JS12540/budget-guard
 ```
 
-You should see: `Successfully added marketplace: budget-guard`
+You should see: `Successfully added marketplace: claude-code-labs`
 
 **Step 3 — Install the plugin**
 
 ```
-/plugin install budget-guard@budget-guard
+/plugin install budget-guard@claude-code-labs
 ```
 
 A panel opens — select **Install for you (user scope)** and confirm.
@@ -130,12 +130,12 @@ claude
 Replace `/path/to/budget-guard` with the actual path.  
 Example: `/Users/yourname/projects/budget-guard`
 
-You should see: `Successfully added marketplace: budget-guard`
+You should see: `Successfully added marketplace: claude-code-labs`
 
 **Step 4 — Install**
 
 ```
-/plugin install budget-guard@budget-guard
+/plugin install budget-guard@claude-code-labs
 ```
 
 Select **Install for you (user scope)** and confirm.
@@ -153,7 +153,7 @@ Select **Install for you (user scope)** and confirm.
 
 ```
 /plugin uninstall budget-guard
-/plugin marketplace remove budget-guard
+/plugin marketplace remove claude-code-labs
 ```
 
 ---
