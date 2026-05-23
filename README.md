@@ -8,10 +8,13 @@
 
 - [What it does](#what-it-does)
 - [Install](#install)
-  - [From the community marketplace](#from-the-community-marketplace)
-  - [From a local directory (development / self-hosted)](#from-a-local-directory-development--self-hosted)
+  - [From GitHub (recommended)](#from-github-recommended)
+  - [From a local clone](#from-a-local-clone)
+  - [Uninstall](#uninstall)
   - [Requirements](#requirements)
 - [Configuration](#configuration)
+  - [Plugin dialog](#1-plugin-dialog-on-install)
+  - [Environment variables](#2-environment-variables-override)
 - [Slash commands](#slash-commands)
 - [How token costs are estimated](#how-token-costs-are-estimated)
 - [Warning tiers](#warning-tiers)
@@ -38,72 +41,58 @@ Claude Code sessions have a finite context window. When it fills up, Claude Code
 
 ## Install
 
-### From the community marketplace
+### From GitHub (recommended)
 
-Once the plugin is listed on the Claude Code community marketplace:
-
-```
-/plugin install budget-guard@claude-community
-```
-
----
-
-### From a local directory (development / self-hosted)
-
-Use this method to install directly from a cloned copy of this repository.
-
-**Step 1 — Clone the repository**
-
-```bash
-git clone https://github.com/JS12540/security-budget-guard.git
-```
-
-**Step 2 — Open Claude Code** in any directory:
+**Step 1 — Open Claude Code** in any directory:
 
 ```bash
 claude
 ```
 
-**Step 3 — Register the folder as a local marketplace**
+**Step 2 — Add the GitHub repo as a marketplace**
 
 ```
-/plugin marketplace add /path/to/security-budget-guard
+/plugin marketplace add https://github.com/JS12540/budget-guard
 ```
 
-Replace `/path/to/security-budget-guard` with the actual path where you cloned the repo.  
-Example: `/Users/yourname/projects/security-budget-guard`
+You should see: `Successfully added marketplace: budget-guard`
 
-You should see: `Successfully added marketplace: local-dev`
-
-**Step 4 — Install the plugin from that marketplace**
+**Step 3 — Install the plugin**
 
 ```
-/plugin install budget-guard@local-dev
+/plugin install budget-guard@budget-guard
 ```
 
-A panel will open. Select **Install for you (user scope)** and confirm.
+A panel opens — select **Install for you (user scope)** and confirm.
 
-**Step 5 — Reload plugins**
+**Step 4 — Reload plugins**
 
 ```
 /reload-plugins
 ```
 
-**Step 6 — Start a fresh session**
+**Step 5 — Start a fresh session**
 
 ```
 /new
 ```
 
-The `SessionStart` hook will fire and show:
+On first run, a setup wizard appears in the terminal:
 
 ```
-[Budget Guard] Session budget: ~100,000 tokens. Warnings fire at 60% and 85%. Run /budget-guard:budget for live breakdown.
+┌─────────────────────────────────────────────┐
+│  Budget Guard — First-Run Setup             │
+│  Press Enter to accept the default value.   │
+└─────────────────────────────────────────────┘
+
+  Session token budget [100000]:
+  Warning threshold %  [60]:
+  Critical threshold % [85]:
 ```
 
-On first run, a setup wizard will appear in the terminal asking for your budget and thresholds. Press Enter to accept the defaults.
+Press Enter three times to accept the defaults, or type your own values.
 
-**Step 7 — Verify it's working**
+**Step 6 — Verify it's working**
 
 Make any tool call (e.g. ask Claude to read a file), then run:
 
@@ -111,7 +100,52 @@ Make any tool call (e.g. ask Claude to read a file), then run:
 /budget-guard:budget
 ```
 
-You should see a live token breakdown with non-zero counts.
+You should see a live report with non-zero token counts, a progress bar, and a per-tool breakdown.
+
+---
+
+### From a local clone
+
+Use this if you want to develop or modify the plugin locally.
+
+**Step 1 — Clone the repo**
+
+```bash
+git clone https://github.com/JS12540/budget-guard.git
+cd budget-guard
+```
+
+**Step 2 — Open Claude Code**
+
+```bash
+claude
+```
+
+**Step 3 — Add the cloned folder as a marketplace**
+
+```
+/plugin marketplace add /path/to/budget-guard
+```
+
+Replace `/path/to/budget-guard` with the actual path.  
+Example: `/Users/yourname/projects/budget-guard`
+
+You should see: `Successfully added marketplace: budget-guard`
+
+**Step 4 — Install**
+
+```
+/plugin install budget-guard@budget-guard
+```
+
+Select **Install for you (user scope)** and confirm.
+
+**Step 5 — Reload and start fresh**
+
+```
+/reload-plugins
+/new
+```
 
 ---
 
@@ -119,25 +153,28 @@ You should see a live token breakdown with non-zero counts.
 
 ```
 /plugin uninstall budget-guard
-/plugin marketplace remove local-dev
+/plugin marketplace remove budget-guard
 ```
 
 ---
 
 ### Requirements
 
-- Claude Code **latest version** (local marketplace source type requires a recent build — run `claude --version` and update if needed)
-- Node.js (included with Claude Code — no separate install needed)
+- **Claude Code latest version** — the marketplace `source` type requires a recent build. Update with:
+  ```bash
+  npm install -g @anthropic-ai/claude-code@latest
+  ```
+- **Node.js** — included with Claude Code, no separate install needed
 
 ---
 
 ## Configuration
 
-Budget Guard has **three configurable values**. Set them in one of two ways:
+Budget Guard has three configurable values.
 
-### 1. Plugin userConfig (recommended)
+### 1. Plugin dialog (on install)
 
-When you first enable the plugin, Claude Code shows a configuration dialog:
+When you install the plugin, a terminal wizard runs on first session start:
 
 | Setting | Description | Default |
 |---|---|---|
@@ -146,13 +183,21 @@ When you first enable the plugin, Claude Code shows a configuration dialog:
 | Critical threshold (%) | Critical warning at this percentage | `85` |
 
 **Plan reference:**
-- Claude Pro: ~100,000 tokens per session
-- Claude Max: ~200,000 tokens per session
-- Teams / Enterprise: check your plan details
+| Plan | Approximate session budget |
+|---|---|
+| Claude Pro | ~100,000 tokens |
+| Claude Max | ~200,000 tokens |
+| Teams / Enterprise | Check your plan |
+
+To re-run the wizard, delete the config file:
+
+```bash
+rm ~/.claude/plugins/data/budget-guard/config.json
+```
 
 ### 2. Environment variables (override)
 
-Set these in your shell profile to override userConfig values without editing anything:
+Set these in your shell profile to override the wizard values at any time:
 
 ```bash
 export CLAUDE_BUDGET_GUARD_LIMIT=200000   # total token budget
@@ -160,7 +205,7 @@ export CLAUDE_BUDGET_GUARD_WARN=55        # advisory warning %
 export CLAUDE_BUDGET_GUARD_CRITICAL=80    # critical warning %
 ```
 
-Env vars take priority over the plugin's userConfig dialog values.
+Env vars take priority over the wizard config.
 
 ---
 
@@ -175,32 +220,32 @@ Env vars take priority over the plugin's userConfig dialog values.
 
 ## How token costs are estimated
 
-Budget Guard uses a heuristic cost model — it is an estimate, not the actual Claude API token count. The estimates are intentionally conservative (they tend to round up) so you get early warnings rather than late ones.
+Budget Guard uses a heuristic cost model — it is an estimate, not the actual Claude API token count. Estimates are intentionally conservative (they round up) so you get early warnings rather than late ones.
 
 | Tool | Estimation method |
 |---|---|
-| `Read` | Checks actual file size via `fs.statSync()`. Accounts for `offset`/`limit` parameters. |
-| `Write` | Measures actual content length |
-| `Edit` / `MultiEdit` | Measures combined old + new string lengths |
+| `Read` | Actual file size via `fs.statSync()`, accounts for `offset`/`limit` parameters |
+| `Write` | Actual content length |
+| `Edit` / `MultiEdit` | Combined old + new string lengths |
 | `Bash` | Command text length + fixed output overhead |
-| `WebFetch` | Fixed ~3,500 tok (typical page content) |
-| `WebSearch` | Fixed ~1,800 tok |
-| `Agent` / `Task` | Fixed ~5,000 tok (subagent spawn overhead) |
-| `mcp__*` | Fixed ~2,500 tok |
-| `Glob`, `Grep`, `LS` | Fixed small values (200–350 tok) |
+| `WebFetch` | Fixed ~3,500 tokens (typical page content) |
+| `WebSearch` | Fixed ~1,800 tokens |
+| `Agent` / `Task` | Fixed ~5,000 tokens (subagent spawn overhead) |
+| `mcp__*` | Fixed ~2,500 tokens |
+| `Glob`, `Grep`, `LS` | Fixed small values (200–350 tokens) |
 
 ---
 
 ## Warning tiers
 
-| Tier | Threshold | What happens |
+| Tier | Threshold | What Claude sees |
 |---|---|---|
-| Advisory | `warn_threshold`% (default 60%) | Claude sees a note about budget usage and the breakdown |
-| Elevated | midpoint between warn and critical | Stronger nudge to prefer targeted tool calls |
-| Critical | `critical_threshold`% (default 85%) | Recommendation to run /compact |
-| Urgent | midpoint between critical and 100% | Strong push to compact immediately |
+| Advisory | `warn_threshold`% (default 60%) | Budget usage note with per-tool breakdown |
+| Elevated | Midpoint between warn and critical | Stronger nudge to prefer targeted tool calls |
+| Critical | `critical_threshold`% (default 85%) | Recommendation to run `/compact` |
+| Urgent | Midpoint between critical and 100% | Strong push to compact immediately |
 
-Each tier fires **once per session**. After `/compact`, all flags reset.
+Each tier fires **exactly once per session**. After `/compact`, all flags reset automatically.
 
 ---
 
@@ -208,26 +253,27 @@ Each tier fires **once per session**. After `/compact`, all flags reset.
 
 Budget Guard stores state in `${CLAUDE_PLUGIN_DATA}/sessions/<session_id>.json` — a persistent directory managed by Claude Code that survives plugin updates.
 
+| File | Purpose |
+|---|---|
+| `sessions/<id>.json` | Live state for the current session |
+| `history.json` | Last 50 completed sessions |
+| `config.json` | Your wizard-configured budget and thresholds |
+
 - Session files are pruned automatically after 7 days
-- History of the last 50 sessions is kept in `${CLAUDE_PLUGIN_DATA}/history.json`
-- State writes are atomic (temp file → rename) to prevent corruption from concurrent sessions
+- All writes are atomic (temp file → rename) to prevent corruption from concurrent sessions
 
 ---
 
 ## Platforms
 
-Works on **macOS, Linux, and Windows** — the hook scripts are plain Node.js with no native dependencies or shell-specific syntax.
+Works on **macOS, Linux, and Windows** — hook scripts are plain Node.js with no native dependencies or shell-specific syntax.
 
----
-
-## Cross-platform compatibility notes
-
-| Platform | Works? | Notes |
+| Platform | Status | Notes |
 |---|---|---|
-| macOS | ✅ | Native |
-| Linux | ✅ | Native |
-| Windows (native) | ✅ | Node.js handles all path differences |
-| Windows (WSL) | ✅ | Runs as Linux |
+| macOS | Supported | Native |
+| Linux | Supported | Native |
+| Windows (native) | Supported | Node.js handles all path differences |
+| Windows (WSL) | Supported | Runs as Linux |
 
 ---
 
@@ -239,7 +285,7 @@ Budget Guard never sends any data outside your machine. All state is stored loca
 
 ## Contributing
 
-Issues and PRs welcome at [github.com/JS12540/security-budget-guard](https://github.com/JS12540/security-budget-guard).
+Issues and PRs welcome at [github.com/JS12540/budget-guard](https://github.com/JS12540/budget-guard).
 
 ---
 
