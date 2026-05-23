@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "budget-guard",
+  "displayName": "Budget Guard",
+  "version": "1.0.0",
+  "description": "Tracks estimated token usage per tool call. Warns Claude at configurable thresholds so you never hit context limits by surprise. Shows a real-time breakdown by tool category.",
+  "author": {
+    "name": "JS12540",
+    "url": "https://github.com/JS12540"
+  },
+  "homepage": "https://github.com/JS12540/security-budget-guard",
+  "repository": "https://github.com/JS12540/security-budget-guard",
+  "license": "MIT",
+  "keywords": [
+    "budget",
+    "tokens",
+    "context",
+    "session",
+    "productivity",
+    "monitoring",
+    "cost"
+  ],
+  "userConfig": {
+    "session_budget": {
+      "type": "number",
+      "title": "Session token budget",
+      "description": "Estimated max tokens per session. Claude Pro ≈ 100,000 | Max ≈ 200,000 | Teams/Enterprise: check your plan.",
+      "default": 100000,
+      "min": 10000,
+      "max": 1000000
+    },
+    "warn_threshold": {
+      "type": "number",
+      "title": "Warning threshold (%)",
+      "description": "Show an advisory warning to Claude at this % of budget used. Default: 60.",
+      "default": 60,
+      "min": 10,
+      "max": 95
+    },
+    "critical_threshold": {
+      "type": "number",
+      "title": "Critical threshold (%)",
+      "description": "Show a critical warning at this %. Default: 85.",
+      "default": 85,
+      "min": 20,
+      "max": 99
+    }
+  }
+}

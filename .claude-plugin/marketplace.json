@@ -1,0 +1,13 @@
+{
+  "name": "local-dev",
+  "owner": {
+    "name": "JS12540"
+  },
+  "plugins": [
+    {
+      "name": "budget-guard",
+      "source": ".",
+      "description": "Tracks estimated token usage per tool call with progressive threshold warnings and a live breakdown via /budget-guard:budget."
+    }
+  ]
+}
