@@ -1,15 +1,11 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "budget-guard",
-  "displayName": "Budget Guard",
-  "version": "1.0.0",
   "description": "Tracks estimated token usage per tool call. Warns Claude at configurable thresholds so you never hit context limits by surprise. Shows a real-time breakdown by tool category.",
+  "version": "1.0.0",
   "author": {
     "name": "JS12540",
     "url": "https://github.com/JS12540"
   },
-  "homepage": "https://github.com/JS12540/security-budget-guard",
-  "repository": "https://github.com/JS12540/security-budget-guard",
   "license": "MIT",
   "keywords": [
     "budget",
@@ -17,14 +13,17 @@
     "context",
     "session",
     "productivity",
-    "monitoring",
-    "cost"
+    "monitoring"
+  ],
+  "skills": [
+    "./skills/budget",
+    "./skills/reset"
   ],
   "userConfig": {
     "session_budget": {
       "type": "number",
       "title": "Session token budget",
-      "description": "Estimated max tokens per session. Claude Pro ≈ 100,000 | Max ≈ 200,000 | Teams/Enterprise: check your plan.",
+      "description": "Estimated max tokens per session. Claude Pro ≈ 100,000 | Max ≈ 200,000",
       "default": 100000,
       "min": 10000,
       "max": 1000000
