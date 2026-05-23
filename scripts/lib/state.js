@@ -21,6 +21,9 @@ const DEFAULT_STATE = {
   critical_threshold: 85,
   total_tokens: 0,
   call_count: 0,
+  turn_count: 0,
+  has_real_data: false,    // true once Stop hook provides real API usage numbers
+  last_input_tokens: 0,    // latest input_tokens value from the API
   // One flag per tier so each warning fires exactly once per session.
   warned_60: false,
   warned_80: false,
@@ -30,11 +33,15 @@ const DEFAULT_STATE = {
   compacted_at: null,
   compacted_count: 0,
   breakdown: {
-    file_ops: 0,
-    bash: 0,
-    mcp: 0,
-    search: 0,
-    agent: 0,
+    file_ops: 0,      // Read, Write, Edit, Glob, Grep, LS inputs
+    bash: 0,          // Bash command inputs
+    mcp: 0,           // MCP tool inputs
+    search: 0,        // WebFetch, WebSearch inputs
+    agent: 0,         // Agent/Task spawns
+    tool_results: 0,  // Tool outputs (PostToolUse)
+    user_messages: 0, // User prompt text (UserPromptSubmit)
+    responses: 0,     // Claude response tokens (Stop)
+    thinking: 0,      // Thinking tokens (Stop, if available)
     other: 0
   }
 };
