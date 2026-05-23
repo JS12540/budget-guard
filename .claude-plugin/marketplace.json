@@ -1,5 +1,5 @@
 {
-  "name": "budget-guard",
+  "name": "claude-code-labs",
   "owner": {
     "name": "JS12540"
   },
@@ -7,7 +7,19 @@
     {
       "name": "budget-guard",
       "source": "./",
-      "description": "Tracks estimated token usage per tool call with progressive threshold warnings and a live breakdown via /budget-guard:budget."
+      "description": "Tracks estimated token usage per tool call with progressive threshold warnings and a live breakdown via /budget-guard:budget.",
+      "version": "1.0.0",
+      "author": {
+        "name": "JS12540"
+      },
+      "keywords": [
+        "budget",
+        "tokens",
+        "context",
+        "session",
+        "monitoring"
+      ],
+      "category": "productivity"
     }
   ]
 }
