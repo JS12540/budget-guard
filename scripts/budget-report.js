@@ -98,7 +98,7 @@ function main() {
     { key: 'agent',         label: 'Agent       ', icon: '🤖' },
     { key: 'thinking',      label: 'Thinking    ', icon: '💭' },
     { key: 'other',         label: 'Other       ', icon: '🔧' }
-  ].filter(c => (bd[c.key] || 0) > 0 || ['responses', 'user_messages', 'file_ops'].includes(c.key));
+  ];
 
   const maxCost = Math.max(1, ...cats.map(c => bd[c.key] || 0));
 

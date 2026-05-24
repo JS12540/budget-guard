@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.2] — 2026-05-24
+
+### Added
+- **Self-registering hooks** — `SessionStart` now automatically writes all hook paths into `~/.claude/settings.json` on first run using `CLAUDE_PLUGIN_ROOT` (set by Claude Code at runtime). This bypasses a known Claude Code bug where plugin-registered `PreToolUse` and `PostToolUse` hooks do not fire during tool calls. Works for every user without any hardcoded paths — each user's correct cache path is detected automatically
+- If hooks were updated, the session context message notifies the user to restart once: `[Hooks registered — restart Claude Code once to activate full tracking.]`
+- Old budget-guard hook entries are cleaned from `settings.json` before writing new ones, so plugin updates always leave a single clean set of hooks
+
+### Changed
+- Budget report now shows all 10 token categories every time regardless of whether they are zero — previously zero-value categories were hidden which made the report look incomplete
+
+### Fixed
+- Plugin hooks not firing for `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, and `Stop` events due to known Claude Code bug with plugin-registered hooks — resolved by auto-registering hooks in `settings.json` via the always-working `SessionStart` hook
+
+---
+
 ## [1.0.1] — 2026-05-23
 
 ### Added

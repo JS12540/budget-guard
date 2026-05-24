@@ -18,6 +18,8 @@
 
 const readline = require('readline');
 const fs       = require('fs');
+const path     = require('path');
+const os       = require('os');
 
 const {
   loadState, saveState, archiveSession, pruneOldSessions,
@@ -89,8 +91,106 @@ async function main(event) {
 
   try { saveState(sessionId, state); } catch (_) {}
 
+  // Auto-register hooks in settings.json so they fire reliably for all users.
+  // Plugin-registered hooks have a known bug in some Claude Code versions where
+  // they don't fire during tool calls. Writing absolute paths to settings.json
+  // bypasses this. We use CLAUDE_PLUGIN_ROOT (set by Claude Code when running
+  // this hook) so the path is always correct for whoever installed the plugin.
+  const registered = ensureHooksRegistered();
+
   // Output plain text — Claude Code adds non-JSON stdout to session context.
-  process.stdout.write(buildContextMessage(state) + '\n');
+  let msg = buildContextMessage(state);
+  if (registered) {
+    msg += ' [Hooks registered — restart Claude Code once to activate full tracking.]';
+  }
+  process.stdout.write(msg + '\n');
+}
+
+// ── Auto-register hooks in settings.json ─────────────────────────────────────
+// Returns true if settings.json was updated (user needs to restart), false if
+// hooks were already up to date.
+
+function ensureHooksRegistered() {
+  const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
+  if (!pluginRoot) return false; // Not running inside Claude Code
+
+  const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
+  const trackCostPath = path.join(pluginRoot, 'scripts', 'track-cost.js');
+
+  // Read current settings
+  let settings = {};
+  try {
+    if (fs.existsSync(settingsPath)) {
+      settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    }
+  } catch (_) { return false; }
+
+  // Check if PreToolUse hook already points to this exact plugin version
+  const existingHooks = settings.hooks || {};
+  const alreadyCurrent = (existingHooks.PreToolUse || []).some(h =>
+    h.hooks && h.hooks.some(hh =>
+      Array.isArray(hh.args) && hh.args[0] === trackCostPath
+    )
+  );
+  if (alreadyCurrent) return false; // Already up to date
+
+  // Build complete hooks config using absolute paths from CLAUDE_PLUGIN_ROOT
+  const budgetHooks = {
+    SessionStart: [{ hooks: [{
+      type: 'command', command: 'node',
+      args: [path.join(pluginRoot, 'scripts', 'session-init.js')],
+      statusMessage: 'Budget Guard initialising…'
+    }]}],
+    UserPromptSubmit: [{ hooks: [{
+      type: 'command', command: 'node',
+      args: [path.join(pluginRoot, 'scripts', 'track-user-prompt.js')]
+    }]}],
+    PreToolUse: [{ matcher: '*', hooks: [{
+      type: 'command', command: 'node',
+      args: [trackCostPath]
+    }]}],
+    PostToolUse: [{ matcher: '*', hooks: [{
+      type: 'command', command: 'node',
+      args: [path.join(pluginRoot, 'scripts', 'track-post-tool.js')]
+    }]}],
+    Stop: [{ hooks: [{
+      type: 'command', command: 'node',
+      args: [path.join(pluginRoot, 'scripts', 'stop-hook.js')]
+    }]}],
+    PostCompact: [{ hooks: [{
+      type: 'command', command: 'node',
+      args: [path.join(pluginRoot, 'scripts', 'post-compact.js')],
+      statusMessage: 'Budget Guard updating after compaction…'
+    }]}]
+  };
+
+  // Merge: strip any old budget-guard hooks, then add fresh ones
+  const merged = {};
+  for (const [event, list] of Object.entries(existingHooks)) {
+    const filtered = list.filter(h =>
+      !h.hooks || !h.hooks.some(hh =>
+        Array.isArray(hh.args) && typeof hh.args[0] === 'string' &&
+        hh.args[0].includes('budget-guard')
+      )
+    );
+    if (filtered.length > 0) merged[event] = filtered;
+  }
+  for (const [event, list] of Object.entries(budgetHooks)) {
+    merged[event] = [...(merged[event] || []), ...list];
+  }
+
+  settings.hooks = merged;
+
+  // Atomic write
+  const tmp = settingsPath + '.tmp.' + process.pid;
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(settings, null, 2), 'utf8');
+    fs.renameSync(tmp, settingsPath);
+    return true; // Hooks were updated — user needs one restart
+  } catch (_) {
+    try { fs.unlinkSync(tmp); } catch (_) {}
+    return false;
+  }
 }
 
 // ── Interactive setup wizard ──────────────────────────────────────────────────

@@ -8,7 +8,7 @@
       "name": "budget-guard",
       "source": "./",
       "description": "Tracks estimated token usage per tool call with progressive threshold warnings and a live breakdown via /budget-guard:budget.",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "author": {
         "name": "JS12540"
       },
